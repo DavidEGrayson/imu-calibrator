@@ -83,9 +83,9 @@ class ImuCalibrator
 
   def run(file=$stdin)
     read_vectors(file)
-    guess_calibration
-    tune_calibration
-    puts @calibration
+    guess = guess_calibration
+    cal = tune_calibration(guess)
+    puts cal
   end
   
   def read_vectors(file)
@@ -102,17 +102,24 @@ class ImuCalibrator
       values = @raw_readings.collect { |v| v[axis] }
       values.percentile_to_value(1, 99)
     end
-    @calibration = Calibration.new guess, @raw_readings
+    Calibration.new guess, @raw_readings
   end
   
-  def tune_calibration
-    $stderr.puts @calibration.info_string
+  def tune_calibration(calibration)
+    $stderr.puts calibration.info_string
     while true
-      @calibration.values.each_with_index do |value, value_id|
-        up = @calibration.increment(value_id, 1)
-        down = @calibration.increment(value_id, -1)
-        @calibration = [down, @calibration, up].max_by &:score
-        $stderr.puts @calibration.info_string
+      last_calibration = calibration
+    
+      calibration.values.each_index do |value_id|
+        up = calibration.increment(value_id, 1)
+        down = calibration.increment(value_id, -1)
+        calibration = [down, calibration, up].max_by &:score
+        #$stderr.puts calibration.info_string
+      end
+      $stderr.puts calibration.info_string
+      
+      if last_calibration == calibration
+        return calibration
       end
     end
   end
