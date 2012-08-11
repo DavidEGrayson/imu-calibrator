@@ -27,6 +27,57 @@ module Enumerable
   
 end
 
+class Calibration
+  attr_reader :values, :raw_readings
+  
+  def initialize(values, raw_readings=nil)
+    @values = values
+    @values.freeze
+    @raw_readings = raw_readings
+  end
+  
+  def score
+    @score ||= -scaled_magnitudes.collect{ |m| (m - 1.0)**2 }.average
+  end
+  
+  def scaled_magnitudes
+    @scaled_magnitudes ||= scaled_readings.collect(&:magnitude)
+  end
+  
+  def scaled_readings
+    @scaled_readings ||= raw_readings.collect { |r| scale r }
+  end
+  
+  def scale(raw_reading)
+    coords = raw_reading.collect.with_index do |component, axis|
+      min, max = values[2*axis, 2]
+      (component - min)/(max - min).to_f - (max - component)/(max - min).to_f  # TODO: simplify
+    end
+    
+    Vector[*coords]
+  end
+  
+  def increment(value_id, change)
+    new_values = values.dup
+    new_values[value_id] += change
+    self.class.new new_values, raw_readings
+  end
+  
+  def info_string
+    "%-45s %7.4f %7.4f %7.4f" % [
+      to_s,
+      scaled_magnitudes.average,
+      scaled_magnitudes.std_deviation,
+      score
+    ]
+  end
+  
+  def to_s
+    return values.inspect
+    "%d %d %d %d %d %d" % values
+  end
+end
+
 class ImuCalibrator
   Axes = (0..2)
 
@@ -34,7 +85,7 @@ class ImuCalibrator
     read_vectors(file)
     guess_calibration
     tune_calibration
-    print_results
+    puts @calibration
   end
   
   def read_vectors(file)
@@ -43,51 +94,29 @@ class ImuCalibrator
       coords = line.split(/,?\s+/).reject(&:empty?).first(3).collect(&:to_i)
       @raw_readings << Vector[*coords]
     end
+    @raw_readings.freeze
   end
   
   def guess_calibration
-    @calibration = Axes.flat_map do |axis|
+    guess = Axes.flat_map do |axis|
       values = @raw_readings.collect { |v| v[axis] }
       values.percentile_to_value(1, 99)
     end
-    
-    puts "Initial guess: #{@calibration.inspect}"
+    @calibration = Calibration.new guess, @raw_readings
   end
   
   def tune_calibration
-    puts "%-45s %7.4f %7.4f %7.4f" % [
-      @calibration.inspect,
-      scaled_magnitudes.average,
-      scaled_magnitudes.std_deviation,
-      score
-    ]
-  end
-  
-  def score
-    -scaled_magnitudes.collect{ |m| (m - 1.0)**2 }.average
-  end
-  
-  def scaled_magnitudes
-    scaled_readings.collect(&:magnitude)
-  end
-  
-  def scaled_readings
-    # TODO: cache these and expire the cache when the calibration changes
-    @raw_readings.collect { |r| scale r }
-  end
-  
-  def scale(raw_reading)
-    coords = raw_reading.collect.with_index do |component, axis|
-      max, min = @calibration[2*axis, 2]
-      (component - min)/(max - min).to_f - (max - component)/(max - min).to_f
+    $stderr.puts @calibration.info_string
+    while true
+      @calibration.values.each_with_index do |value, value_id|
+        up = @calibration.increment(value_id, 1)
+        down = @calibration.increment(value_id, -1)
+        @calibration = [down, @calibration, up].max_by &:score
+        $stderr.puts @calibration.info_string
+      end
     end
-    
-    Vector[*coords]
   end
-  
-  def print_results
-    puts @calibration.inspect
-  end
+
 end
 
 ImuCalibrator.new.run
