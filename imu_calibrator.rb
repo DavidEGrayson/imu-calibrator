@@ -1,3 +1,5 @@
+#!/bin/env ruby
+
 require 'matrix'
 
 module Enumerable
@@ -44,7 +46,7 @@ class ImuCalibrator
   end
   
   def guess_calibration
-    @calibration = Axes.collect do |axis|
+    @calibration = Axes.flat_map do |axis|
       values = @raw_readings.collect { |v| v[axis] }
       values.percentile_to_value(1, 99)
     end
@@ -76,7 +78,7 @@ class ImuCalibrator
   
   def scale(raw_reading)
     coords = raw_reading.collect.with_index do |component, axis|
-      max, min = @calibration[axis]
+      max, min = @calibration[2*axis, 2]
       (component - min)/(max - min).to_f - (max - component)/(max - min).to_f
     end
     
