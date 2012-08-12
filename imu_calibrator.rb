@@ -110,18 +110,9 @@ class ImuCalibrator
       last_calibration = calibration
     
       calibration.values.each_index do |value_id|
-        [1, -1].each do |dir|
-          new_cal = calibration.increment(value_id, dir)
-          if new_cal.score > calibration.score
-            calibration = new_cal
-            while true
-              new_cal = calibration.increment(value_id, dir)
-              break unless new_cal.score > calibration.score
-              calibration = new_cal
-            end
-            break
-          end
-        end
+        calibration = try_dir(calibration, value_id, 1) ||
+          try_dir(calibration, value_id, -1) ||
+          calibration
       end
       $stderr.puts calibration.info_string
       
@@ -131,6 +122,15 @@ class ImuCalibrator
     end
   end
 
+  def try_dir(cal, value_id, dir)
+    improved_cal = nil
+    while true
+      new_cal = cal.increment(value_id, dir)
+      return improved_cal unless new_cal.score > cal.score
+      improved_cal = cal = new_cal
+    end
+  end
+  
 end
 
 ImuCalibrator.new.run
