@@ -2,6 +2,30 @@
 
 require 'matrix'
 
+module Profiler    
+  require 'ruby-prof'
+
+  def run_time
+    start = Time.now
+    yield
+    Time.now - start
+  end
+  
+  def profile(&block)
+    result = RubyProf.profile &block
+    print_profile_result result
+    result
+  end
+  
+  def print_profile_result(result)
+    File.open("profile.html", "w") do |file|
+      RubyProf::GraphHtmlPrinter.new(result).print(file)
+    end
+  end
+end
+  
+include Profiler
+
 module Enumerable
   def percentile_to_value(*percentiles)
     sorted_values = sort
@@ -50,12 +74,15 @@ class Calibration
   end
   
   def scale(raw_reading)
-    coords = raw_reading.collect.with_index do |component, axis|
-      min, max = values[2*axis, 2]
-      (component - min)/(max - min).to_f - (max - component)/(max - min).to_f  # TODO: simplify
-    end
+    #coords = raw_reading.collect.with_index do |component, axis|
+    #  min, max = values[2*axis, 2]
+    #  (component - min)/(max - min).to_f * 2 - 1
+    #end
+    # Vector[*coords]
     
-    Vector[*coords]
+    Vector[(raw_reading[0] - values[0])/(values[1] - values[0]).to_f * 2 - 1,
+      (raw_reading[1] - values[2])/(values[3] - values[2]).to_f * 2 - 1,
+      (raw_reading[2] - values[4])/(values[5] - values[4]).to_f * 2 - 1]
   end
   
   def increment(value_id, change)
@@ -104,21 +131,17 @@ class ImuCalibrator
     Calibration.new guess, @raw_readings
   end
   
-  def tune(calibration)
-    $stderr.puts calibration.info_string
+  def tune(cal)
+    $stderr.puts cal.info_string
     while true
-      last_calibration = calibration
+      last_cal = cal
     
-      calibration.values.each_index do |value_id|
-        calibration = try_dir(calibration, value_id, 1) ||
-          try_dir(calibration, value_id, -1) ||
-          calibration
+      cal.values.each_index do |value_id|
+        cal = try_dir(cal, value_id, 1) || try_dir(cal, value_id, -1) || cal
       end
-      $stderr.puts calibration.info_string
+      $stderr.puts cal.info_string
       
-      if last_calibration == calibration
-        return calibration
-      end
+      return cal if last_cal == cal
     end
   end
 
@@ -133,4 +156,6 @@ class ImuCalibrator
   
 end
 
-ImuCalibrator.new.run
+profile do
+  ImuCalibrator.new.run
+end
