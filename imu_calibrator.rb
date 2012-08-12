@@ -28,6 +28,8 @@ module Enumerable
 end
 
 class Calibration
+  include Comparable
+
   attr_reader :values, :raw_readings
   
   def initialize(values, raw_readings=nil)
@@ -62,7 +64,7 @@ class Calibration
     new_values[value_id] += change
     self.class.new new_values, raw_readings
   end
-  
+
   def info_string
     "%-45s %7.4f %7.4f %7.4f" % [
       to_s,
@@ -111,10 +113,19 @@ class ImuCalibrator
       last_calibration = calibration
     
       calibration.values.each_index do |value_id|
-        up = calibration.increment(value_id, 1)
-        down = calibration.increment(value_id, -1)
-        calibration = [down, calibration, up].max_by &:score
-        #$stderr.puts calibration.info_string
+        [1, -1].each do |dir|
+          puts "dir = #{dir}"
+          new_cal = calibration.increment(value_id, dir)
+          if new_cal.score > calibration.score
+            calibration = new_cal
+            while true
+              new_cal = calibration.increment(value_id, dir)
+              break unless new_cal.score > calibration.score
+              calibration = new_cal
+            end
+            break
+          end
+        end
       end
       $stderr.puts calibration.info_string
       
