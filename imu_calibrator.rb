@@ -49,6 +49,10 @@ module Enumerable
     Math.sqrt variance
   end
   
+  def regular_sample(num)
+    each_slice(size/num).collect(&:first)
+  end
+  
 end
 
 class Calibration
@@ -60,6 +64,17 @@ class Calibration
     @values.freeze
     @raw_readings = raw_readings
   end
+  
+  def switch_readings(readings)
+    self.class.new values, readings
+  end
+  
+  def increment(value_id, change)
+    new_values = values.dup
+    new_values[value_id] += change
+    self.class.new new_values, raw_readings
+  end
+
   
   def score
     @score ||= -scaled_magnitudes.collect{ |m| (m - 1.0)**2 }.average
@@ -74,21 +89,9 @@ class Calibration
   end
   
   def scale(raw_reading)
-    #coords = raw_reading.collect.with_index do |component, axis|
-    #  min, max = values[2*axis, 2]
-    #  (component - min)/(max - min).to_f * 2 - 1
-    #end
-    # Vector[*coords]
-    
     Vector[(raw_reading[0] - values[0])/(values[1] - values[0]).to_f * 2 - 1,
       (raw_reading[1] - values[2])/(values[3] - values[2]).to_f * 2 - 1,
       (raw_reading[2] - values[4])/(values[5] - values[4]).to_f * 2 - 1]
-  end
-  
-  def increment(value_id, change)
-    new_values = values.dup
-    new_values[value_id] += change
-    self.class.new new_values, raw_readings
   end
 
   def info_string
@@ -110,28 +113,31 @@ class ImuCalibrator
   Axes = (0..2)
 
   def run(file=$stdin)
-    read_vectors(file)
-    puts tune(guess)
+    raw_readings = read_vectors(file).freeze
+    raw_readings_sample = raw_readings.regular_sample(300).freeze
+    cal1 = guess(raw_readings)
+    cal2 = tune(cal1, raw_readings_sample)
+    cal3 = tune(cal2, raw_readings)
+    puts cal3
   end
   
   def read_vectors(file)
-    @raw_readings = []
-    file.each_line do |line|
+    file.each_line.collect do |line|
       coords = line.split(/,?\s+/).reject(&:empty?).first(3).collect(&:to_i)
-      @raw_readings << Vector[*coords]
+      Vector[*coords]
     end
-    @raw_readings.freeze
   end
   
-  def guess
+  def guess(readings)
     guess = Axes.flat_map do |axis|
-      values = @raw_readings.collect { |v| v[axis] }
+      values = readings.collect { |v| v[axis] }
       values.percentile_to_value(1, 99)
     end
-    Calibration.new guess, @raw_readings
+    Calibration.new guess
   end
   
-  def tune(cal)
+  def tune(cal, readings)
+    cal = cal.switch_readings(readings)
     $stderr.puts cal.info_string
     while true
       last_cal = cal
@@ -156,6 +162,6 @@ class ImuCalibrator
   
 end
 
-profile do
+#profile do
   ImuCalibrator.new.run
-end
+#end
