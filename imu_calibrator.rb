@@ -28,7 +28,6 @@ module Enumerable
 end
 
 class Calibration
-  include Comparable
 
   attr_reader :values, :raw_readings
   
@@ -85,9 +84,7 @@ class ImuCalibrator
 
   def run(file=$stdin)
     read_vectors(file)
-    guess = guess_calibration
-    cal = tune_calibration(guess)
-    puts cal
+    puts tune(guess)
   end
   
   def read_vectors(file)
@@ -99,7 +96,7 @@ class ImuCalibrator
     @raw_readings.freeze
   end
   
-  def guess_calibration
+  def guess
     guess = Axes.flat_map do |axis|
       values = @raw_readings.collect { |v| v[axis] }
       values.percentile_to_value(1, 99)
@@ -107,14 +104,13 @@ class ImuCalibrator
     Calibration.new guess, @raw_readings
   end
   
-  def tune_calibration(calibration)
+  def tune(calibration)
     $stderr.puts calibration.info_string
     while true
       last_calibration = calibration
     
       calibration.values.each_index do |value_id|
         [1, -1].each do |dir|
-          puts "dir = #{dir}"
           new_cal = calibration.increment(value_id, dir)
           if new_cal.score > calibration.score
             calibration = new_cal
