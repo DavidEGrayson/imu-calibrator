@@ -95,7 +95,7 @@ class Calibration
   end
 
   def info_string
-    "%-45s %7.4f %7.4f %7.4f" % [
+    "%-32s %7.4f %7.4f %7.4f" % [
       to_s,
       scaled_magnitudes.average,
       scaled_magnitudes.std_deviation,
@@ -104,7 +104,6 @@ class Calibration
   end
   
   def to_s
-    return values.inspect
     "%d %d %d %d %d %d" % values
   end
 end
@@ -122,10 +121,14 @@ class ImuCalibrator
   end
   
   def read_vectors(file)
-    file.each_line.collect do |line|
+    vectors = file.each_line.collect do |line|
       coords = line.split(/,?\s+/).reject(&:empty?).first(3).collect(&:to_i)
       Vector[*coords]
     end
+    
+    vectors.uniq!  # save processing time
+    
+    vectors
   end
   
   def guess(readings)
@@ -162,6 +165,6 @@ class ImuCalibrator
   
 end
 
-#profile do
+profile do
   ImuCalibrator.new.run
-#end
+end
