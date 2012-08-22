@@ -4,26 +4,26 @@ import sys
 import math
 
 # from http://code.activestate.com/recipes/577452-a-memoize-decorator-for-instance-methods/
-class memoize(object):
+class memoize:
   def __init__(self, func):
     self.func = func
     
   def __get__(self, obj, objtype=None):
     if obj is None:
-        return self.func
+      return self.func
     return partial(self, obj)
   
   def __call__(self, *args, **kw):
     obj = args[0]
     try:
-        cache = obj.__cache
+      cache = obj.__cache
     except AttributeError:
-        cache = obj.__cache = {}
+      cache = obj.__cache = {}
     key = (self.func, args[1:], frozenset(kw.items()))
     try:
-        res = cache[key]
+      res = cache[key]
     except KeyError:
-        res = cache[key] = self.func(*args, **kw)
+      res = cache[key] = self.func(*args, **kw)
     return res
 
 def average(list):
