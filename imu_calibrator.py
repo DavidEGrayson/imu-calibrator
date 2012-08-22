@@ -1,5 +1,15 @@
 from __future__ import print_function
 import sys
+import math
+
+# TODO: this shouldn't work, right???  Becuase cache will not be instance-specific
+def memoize(f):  # change this to assume no args are provided and simplify it
+  cache = {}
+  def memf(*x):
+    if x not in cache:
+      cache[x] = f(*x)
+    return cache[x]
+  return memf
 
 def average(list):
   return sum(list)/len(list)
@@ -8,6 +18,12 @@ def percentile_to_value(list, *percentiles):
   list = sorted(list)
   return [list[int(p / 100.0 * (len(list)-1))] for p in percentiles]
 
+def variance(list):
+  m = average(list)
+  return sum([(i-m)**2 for i in list]) / float(len(list))
+
+def std_deviation(list):
+  return math.sqrt(variance(list))
 
 class Vector(object):
   def __init__(self, x, y, z):
@@ -24,6 +40,9 @@ class Vector(object):
       return self.z
     else:
       raise Exception("Invalid key")
+      
+  def magnitude(self):
+    return math.sqrt(self.x**2 + self.y**2 + self.z**2)
     
 Axes = range(3)
 
@@ -32,26 +51,38 @@ class Calibration:
     self.values = tuple(values)
     self.raw_readings = raw_readings
 
+  def scale(self, raw_reading):
+    return Vector((raw_reading[0] - self.values[0])/float(self.values[1] - self.values[0]) * 2 - 1,
+      (raw_reading[1] - self.values[2])/float(self.values[3] - self.values[2]) * 2 - 1,
+      (raw_reading[2] - self.values[4])/float(self.values[5] - self.values[4]) * 2 - 1)
+
   def __str__(self):
     return "%d %d %d %d %d %d" % self.values
 
   def info_string(self):
     return "%-32s %7.4f %7.4f %7.4f" % (
       str(self),
-      average(self.scaled_magnitudes),
-      std_deviation(self.scaled_magnitudes),
+      average(self.scaled_magnitudes()),
+      std_deviation(self.scaled_magnitudes()),
       self.score()
     )
     
   def switch_readings(self, raw_readings):
     return Calibration(self.values, raw_readings)
-    
-  def scaled_readings(self): # TODO: memoize this!
-    return [scale(r) for r in self.raw_readings]
-    
-  def scale(self):
-     raise Exception("TODO")
   
+  @memoize
+  def scaled_magnitudes(self):
+    return [s.magnitude() for s in self.scaled_readings()]
+    
+  @memoize
+  def scaled_readings(self):
+    return [self.scale(r) for r in self.raw_readings]
+  
+  @memoize
+  def score(self):
+    return -average([(m - 1.0)**2 for m in self.scaled_magnitudes()])
+    
+
   
 def run(file=sys.stdin):
   raw_readings = read_vectors(file)
