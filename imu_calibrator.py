@@ -94,6 +94,8 @@ def run(file=sys.stdin):
   raw_readings_sample = raw_readings[0::(len(raw_readings)/300)]
   cal1 = guess(raw_readings)
   cal2 = tune(cal1, raw_readings_sample)
+  cal3 = tune(cal2, raw_readings)  
+  print(cal3)
 
 def read_vectors(file):
   return [Vector(*[int(s) for s in line.split()[0:3]]) for line in file]
@@ -109,7 +111,7 @@ def try_dir(cal, value_id, dir):
   improved_cal = None
   while True:
     new_cal = cal.increment(value_id, dir)
-    if not new_cal.score > cal.score:
+    if not new_cal.score() > cal.score():
       return improved_cal
     improved_cal = cal = new_cal
   return None
