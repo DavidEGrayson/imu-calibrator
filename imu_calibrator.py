@@ -1,16 +1,30 @@
 from __future__ import print_function
+from functools import partial
 import sys
 import math
 
-# TODO: this shouldn't work, right???  Becuase cache will not be instance-specific
-# try: http://code.activestate.com/recipes/577452-a-memoize-decorator-for-instance-methods/
-def memoize(f):  # change this to assume no args are provided and simplify it
-  cache = {}
-  def memf(*x):
-    if x not in cache:
-      cache[x] = f(*x)
-    return cache[x]
-  return memf
+# from http://code.activestate.com/recipes/577452-a-memoize-decorator-for-instance-methods/
+class memoize(object):
+  def __init__(self, func):
+    self.func = func
+    
+  def __get__(self, obj, objtype=None):
+    if obj is None:
+        return self.func
+    return partial(self, obj)
+  
+  def __call__(self, *args, **kw):
+    obj = args[0]
+    try:
+        cache = obj.__cache
+    except AttributeError:
+        cache = obj.__cache = {}
+    key = (self.func, args[1:], frozenset(kw.items()))
+    try:
+        res = cache[key]
+    except KeyError:
+        res = cache[key] = self.func(*args, **kw)
+    return res
 
 def average(list):
   return sum(list)/len(list)
