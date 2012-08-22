@@ -3,6 +3,7 @@ import sys
 import math
 
 # TODO: this shouldn't work, right???  Becuase cache will not be instance-specific
+# try: http://code.activestate.com/recipes/577452-a-memoize-decorator-for-instance-methods/
 def memoize(f):  # change this to assume no args are provided and simplify it
   cache = {}
   def memf(*x):
@@ -48,7 +49,7 @@ Axes = range(3)
 
 class Calibration:
   def __init__(self, values, raw_readings=None):
-    self.values = tuple(values)
+    self.values = values
     self.raw_readings = raw_readings
 
   def scale(self, raw_reading):
@@ -57,7 +58,7 @@ class Calibration:
       (raw_reading[2] - self.values[4])/float(self.values[5] - self.values[4]) * 2 - 1)
 
   def __str__(self):
-    return "%d %d %d %d %d %d" % self.values
+    return "%d %d %d %d %d %d" % tuple(self.values)
 
   def info_string(self):
     return "%-32s %7.4f %7.4f %7.4f" % (
@@ -81,8 +82,12 @@ class Calibration:
   @memoize
   def score(self):
     return -average([(m - 1.0)**2 for m in self.scaled_magnitudes()])
+  
+  def increment(self, value_id, dir):
+    values = list(self.values)
+    values[value_id] += dir
+    return Calibration(values, self.raw_readings)
     
-
   
 def run(file=sys.stdin):
   raw_readings = read_vectors(file)
@@ -100,9 +105,29 @@ def guess(readings):
     guess.extend(percentile_to_value(values, 1, 99))
   return Calibration(guess)
 
+def try_dir(cal, value_id, dir):
+  improved_cal = None
+  while True:
+    new_cal = cal.increment(value_id, dir)
+    if not new_cal.score > cal.score:
+      return improved_cal
+    improved_cal = cal = new_cal
+  return None
+  
 def tune(cal, readings):
   cal = cal.switch_readings(readings)
   print(cal.info_string(), file=sys.stderr)
+  while True:
+    last_cal = cal
+    
+    for value_id in range(len(cal.values)):
+      cal = try_dir(cal, value_id, 1) or try_dir(cal, value_id, -1) or cal
+    print(cal.info_string(), file=sys.stderr)
 
+    if last_cal == cal:
+      return cal 
+    
+  
+  
 if __name__=='__main__':
   run()
