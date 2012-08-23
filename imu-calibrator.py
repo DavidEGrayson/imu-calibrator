@@ -126,6 +126,9 @@ def run(file=sys.stdin):
   except UserError as e:
     print("Error: " + str(e), file=sys.stderr)
 
+  except KeyboardInterrupt:
+    pass
+
 def read_vectors(file):
   vectors = [Vector(*[int(s) for s in line.split()[0:3]]) for line in file]
   # If len(vectors)<300, we get an error in raw_readings[0::(len(raw_readings)/300)] above.
