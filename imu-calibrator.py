@@ -1,7 +1,12 @@
+#!/usr/bin/env python
+
 from __future__ import print_function
 from functools import partial
 import sys
 import math
+
+class UserError(Exception):
+  pass
 
 # from http://code.activestate.com/recipes/577452-a-memoize-decorator-for-instance-methods/
 class memoize(object):
@@ -104,19 +109,27 @@ class Calibration:
     
   
 def run(file=sys.stdin):
-  print("Reading data...", file=sys.stderr)
-  raw_readings = read_vectors(file)
+  try:
+    print("Reading data...", file=sys.stderr)
+    raw_readings = read_vectors(file)
   
-  print("Optimizing calibration...", file=sys.stderr)
-  raw_readings_sample = raw_readings[0::(len(raw_readings)/300)]
-  cal1 = guess(raw_readings)
-  cal2 = tune(cal1, raw_readings_sample)
-  cal3 = tune(cal2, raw_readings)
+    print("Optimizing calibration...", file=sys.stderr)
+    raw_readings_sample = raw_readings[0::(len(raw_readings)/300)]
+    cal1 = guess(raw_readings)
+    cal2 = tune(cal1, raw_readings_sample)
+    cal3 = tune(cal2, raw_readings)
   
-  print(cal3)
+    print(cal3)
+
+  except UserError as e:
+    print("Error: " + str(e), file=sys.stderr)
 
 def read_vectors(file):
-  return [Vector(*[int(s) for s in line.split()[0:3]]) for line in file]
+  vectors = [Vector(*[int(s) for s in line.split()[0:3]]) for line in file]
+  # If len(vectors)<300, we get an error in raw_readings[0::(len(raw_readings)/300)] above.
+  if len(vectors) < 300:
+    raise UserError("Only " + str(len(vectors)) + " readings were provided.  Please provide at least 300.")
+  return vectors
 
 def guess(readings):
   guess = []
