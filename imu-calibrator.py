@@ -5,6 +5,8 @@ from functools import partial
 import sys
 import math
 
+verbose = True   # TODO: accept -v argument to set this
+
 class UserError(Exception):
   pass
 
@@ -149,13 +151,18 @@ def try_dir(cal, value_id, dir):
   
 def tune(cal, readings):
   cal = cal.switch_readings(readings)
-  #print(cal.info_string(), file=sys.stderr)
+
+  if verbose:
+    print(cal.info_string(), file=sys.stderr)
+
   while True:
     last_cal = cal
     
     for value_id in range(len(cal.values)):
       cal = try_dir(cal, value_id, 1) or try_dir(cal, value_id, -1) or cal
-    #print(cal.info_string(), file=sys.stderr)
+
+    if verbose:
+      print(cal.info_string(), file=sys.stderr)
 
     if last_cal == cal:
       return cal 
