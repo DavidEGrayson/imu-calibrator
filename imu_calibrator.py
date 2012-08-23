@@ -4,7 +4,7 @@ import sys
 import math
 
 # from http://code.activestate.com/recipes/577452-a-memoize-decorator-for-instance-methods/
-class memoize:
+class memoize(object):
   def __init__(self, func):
     self.func = func
     
@@ -104,11 +104,15 @@ class Calibration:
     
   
 def run(file=sys.stdin):
+  print("Reading data...", file=sys.stderr)
   raw_readings = read_vectors(file)
+  
+  print("Optimizing calibration...", file=sys.stderr)
   raw_readings_sample = raw_readings[0::(len(raw_readings)/300)]
   cal1 = guess(raw_readings)
   cal2 = tune(cal1, raw_readings_sample)
-  cal3 = tune(cal2, raw_readings)  
+  cal3 = tune(cal2, raw_readings)
+  
   print(cal3)
 
 def read_vectors(file):
@@ -132,13 +136,13 @@ def try_dir(cal, value_id, dir):
   
 def tune(cal, readings):
   cal = cal.switch_readings(readings)
-  print(cal.info_string(), file=sys.stderr)
+  #print(cal.info_string(), file=sys.stderr)
   while True:
     last_cal = cal
     
     for value_id in range(len(cal.values)):
       cal = try_dir(cal, value_id, 1) or try_dir(cal, value_id, -1) or cal
-    print(cal.info_string(), file=sys.stderr)
+    #print(cal.info_string(), file=sys.stderr)
 
     if last_cal == cal:
       return cal 
